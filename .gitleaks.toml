@@ -1,0 +1,20 @@
+# Gitleaks' default rules plus a few aimed at test code, where credentials
+# tend to slip in as literals instead of coming from config.
+title = "showcase secret scan"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "password-literal"
+description = "Password assigned as a string literal"
+regex = '''(?i)\b(?:password|passwd|pwd)\b\s*[:=]\s*["']([^"'\s]{6,})["']'''
+secretGroup = 1
+keywords = ["password", "passwd", "pwd"]
+
+[[rules]]
+id = "bearer-token-literal"
+description = "Bearer token written into code"
+regex = '''(?i)\bbearer\s+([a-z0-9\-_.=]{20,})'''
+secretGroup = 1
+keywords = ["bearer"]

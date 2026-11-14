@@ -1,0 +1,22 @@
+# OWASP Juice Shop, the application under test. Local only: the port is bound
+# to 127.0.0.1 so nothing outside this machine can reach it.
+#   docker compose up -d --wait
+#   docker compose down
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:v20.3.0
+    environment:
+      # Built-in profile without solved-challenge pop-ups, hints or welcome banner.
+      NODE_ENV: quiet
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        - CMD
+        - /nodejs/bin/node
+        - -e
+        - "fetch('http://127.0.0.1:3000/rest/admin/application-version').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 5s

@@ -1,0 +1,93 @@
+# The suites by area, one job after another, then one merged case report.
+# Run selected cases from the Actions tab: "Run workflow" with Cases, e.g.
+# "bvt.basket.add-product, security.idor.basket-read". Only the areas holding
+# them run; an unknown case fails the run before any area starts.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: Case refs from config/test_cases.toml (empty runs every case)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  select:
+    name: Select areas
+    runs-on: ubuntu-latest
+    outputs:
+      areas: ${{ steps.areas.outputs.areas }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - id: areas
+        env:
+          CASES: ${{ inputs.cases }}
+        run: echo "areas=$(uv run --frozen python -m tools.case_areas "$CASES")" >> "$GITHUB_OUTPUT"
+
+  account:
+    needs: select
+    if: ${{ !cancelled() && needs.select.result == 'success' && contains(needs.select.outputs.areas, ',account,') }}
+    uses: ./.github/workflows/area.yml
+    with:
+      area: account
+      cases: ${{ inputs.cases }}
+      reruns: 1
+
+  shopping:
+    needs: [select, account]
+    if: ${{ !cancelled() && needs.select.result == 'success' && contains(needs.select.outputs.areas, ',shopping,') }}
+    uses: ./.github/workflows/area.yml
+    with:
+      area: shopping
+      cases: ${{ inputs.cases }}
+      reruns: 1
+
+  security:
+    needs: [select, shopping]
+    if: ${{ !cancelled() && needs.select.result == 'success' && contains(needs.select.outputs.areas, ',security,') }}
+    uses: ./.github/workflows/area.yml
+    with:
+      area: security
+      cases: ${{ inputs.cases }}
+      # A security test is never retried: a pass on the second try is a finding.
+      reruns: 0
+
+  report-cases:
+    name: Case report (dry run)
+    needs: [select, account, shopping, security]
+    if: ${{ !cancelled() && needs.select.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          path: results
+          merge-multiple: true
+      - name: Merge every area's JUnit into one case report
+        env:
+          AREAS: ${{ needs.select.outputs.areas }}
+          CASES: ${{ inputs.cases }}
+        run: >
+          uv run --frozen python -m tools.case_report case-report/cases.json results/*.xml
+          --expect "$AREAS" --cases "$CASES"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: case-report
+          path: case-report/
+          retention-days: 14
+          if-no-files-found: ignore

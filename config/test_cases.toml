@@ -1,0 +1,42 @@
+# Test-to-case mapping for the case management reporter (framework/reporting).
+# Tests never name their case; this file does. Keys are test ids without
+# parameters; one case may cover several tests or parameters.
+
+[reporter]
+# "dry-run" writes the request it would send instead of sending it.
+adapter = "dry-run"
+
+[cases]
+"tests/bvt/test_account_access.py::test_registration_new_customer_logs_in" = "bvt.account.register-and-log-in"
+"tests/bvt/test_account_access.py::test_login_wrong_password_refused" = "bvt.account.reject-wrong-password"
+"tests/bvt/test_account_access.py::test_logout_offers_login" = "bvt.account.log-out"
+"tests/bvt/test_account_settings.py::test_change_password_then_log_in" = "bvt.settings.change-password"
+"tests/bvt/test_account_settings.py::test_address_book_saves_address" = "bvt.settings.save-address"
+"tests/bvt/test_product_search.py::test_search_finds_matching_product" = "bvt.search.find-product"
+"tests/bvt/test_product_search.py::test_search_without_matches_lists_nothing" = "bvt.search.no-matches"
+"tests/bvt/test_basket.py::test_basket_add_product" = "bvt.basket.add-product"
+"tests/bvt/test_basket.py::test_basket_quantity_updates_total" = "bvt.basket.change-quantity"
+"tests/bvt/test_basket.py::test_basket_remove_leaves_empty" = "bvt.basket.remove-product"
+"tests/bvt/test_checkout.py::test_checkout_places_order" = "bvt.checkout.place-order"
+"tests/bvt/test_order_history.py::test_order_history_lists_placed_order" = "bvt.orders.list-placed-order"
+"tests/bvt/test_order_history.py::test_order_history_empty_for_new_customer" = "bvt.orders.empty-history"
+"tests/security/test_access_control.py::test_idor_basket_write" = "security.idor.basket-write"
+"tests/security/test_access_control.py::test_idor_basket_read" = "security.idor.basket-read"
+"tests/security/test_access_control.py::test_idor_address_read" = "security.idor.address-read"
+"tests/security/test_access_control.py::test_idor_card_read" = "security.idor.card-read"
+"tests/security/test_access_control.py::test_idor_order_history" = "security.idor.order-history"
+"tests/security/test_authorization.py::test_authorization_token_required" = "security.authorization.token-required"
+"tests/security/test_authorization.py::test_authorization_all_orders" = "security.authorization.all-orders"
+"tests/security/test_authorization.py::test_authorization_user_list" = "security.authorization.user-list"
+"tests/security/test_authorization.py::test_authorization_auth_details" = "security.authorization.auth-details"
+"tests/security/test_rate_limiting.py::test_rate_limit_login" = "security.rate-limit.login"
+"tests/security/test_security_headers.py::test_headers_nosniff" = "security.headers.nosniff"
+"tests/security/test_security_headers.py::test_headers_framing" = "security.headers.framing"
+"tests/security/test_security_headers.py::test_headers_content_security_policy" = "security.headers.csp"
+"tests/security/test_security_headers.py::test_headers_cors" = "security.headers.cors"
+"tests/security/test_sensitive_data.py::test_data_exposure_user_record" = "security.data-exposure.user-record"
+"tests/security/test_sensitive_data.py::test_data_exposure_login_token" = "security.data-exposure.login-token"
+"tests/security/test_sensitive_data.py::test_data_exposure_password_change" = "security.data-exposure.password-change"
+"tests/security/test_injection.py::test_injection_search" = "security.injection.search"
+"tests/security/test_injection.py::test_injection_login_password" = "security.injection.login-password"
+"tests/security/test_injection.py::test_injection_login_email" = "security.injection.login-email"

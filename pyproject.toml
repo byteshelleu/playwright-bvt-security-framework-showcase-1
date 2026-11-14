@@ -1,0 +1,63 @@
+[project]
+name = "playwright-bvt-security-framework-showcase"
+version = "0.1.0"
+description = "Playwright + pytest showcase: a BVT suite and a security suite against OWASP Juice Shop."
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "filelock>=4.2.10",
+    "mypy>=2.4.1",
+    "playwright>=1.65.2",
+    "pre-commit>=4.0",
+    "pydantic>=2.14.3",
+    "pytest>=8.4,<9",  # pytest 9 breaks xdist --dist loadgroup (xdist 3.8)
+    "pytest-html>=4.2.0",
+    "pytest-playwright>=0.10.0",
+    "pytest-rerunfailures>=16.7",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.17.5",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = [
+    "--strict-markers",
+    "--screenshot=only-on-failure",
+    "--tracing=retain-on-failure",
+    "--output=test-results",
+    "--only-rerun=^TargetClosedError:",
+    "--only-rerun=^Error: [^\\n]*net::ERR_",
+    "--only-rerun=^ConnectionRefusedError:",
+    "--only-rerun=^ConnectionResetError:",
+]
+markers = [
+    "bvt: build verification test",
+    "smoke: the smallest set that proves the shop works",
+    "api: security test driven through the API",
+    "e2e: security test driven through the browser",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "N", "B", "RUF", "T20", "C90"]
+external = ["R008"]
+
+[tool.ruff.lint.per-file-ignores]
+"framework/helpers/api_contracts.py" = ["N815"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["framework", "tests", "tools"]

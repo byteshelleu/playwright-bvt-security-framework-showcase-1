@@ -1,0 +1,119 @@
+# One CI area against Juice Shop as a service container.
+# The pytest step is retried once only when pytest itself broke (exit 2, 3 or 4)
+# or wrote no JUnit; a test failure (exit 1) is never retried, and an area with
+# no selected test (exit 5) passes. The Verdict step decides the job.
+name: area
+
+on:
+  workflow_call:
+    inputs:
+      area:
+        type: string
+        required: true
+      cases:
+        type: string
+        default: ""
+      reruns:
+        description: Retries per test for infrastructure errors (--only-rerun in pyproject.toml)
+        type: number
+        default: 1
+
+permissions:
+  contents: read
+
+env:
+  JUICE_SHOP_URL: http://localhost:3000
+
+jobs:
+  run:
+    name: ${{ inputs.area }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      juice-shop:
+        image: bkimminich/juice-shop:v20.3.0
+        env:
+          NODE_ENV: quiet
+        ports:
+          - 3000:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install Chromium
+        run: uv run --frozen playwright install --with-deps chromium
+
+      # The image has no shell, so Docker health options cannot run here.
+      - name: Wait for Juice Shop
+        run: >
+          curl --silent --fail --output /dev/null
+          --retry 40 --retry-all-errors --retry-delay 3
+          "$JUICE_SHOP_URL/rest/admin/application-version"
+
+      - name: Check Juice Shop
+        run: uv run --frozen python -m tools.juice_shop check
+
+      - name: Run ${{ inputs.area }}
+        id: first
+        continue-on-error: true
+        timeout-minutes: 15
+        env: &area-env
+          AREA: ${{ inputs.area }}
+          CASES: ${{ inputs.cases }}
+          RERUNS: ${{ inputs.reruns }}
+        run: &area-run |
+          rm -f "test-results/$AREA.xml"
+          set +e
+          uv run --frozen pytest tests --area "$AREA" --cases "$CASES" \
+            -n auto --dist loadgroup --reruns="$RERUNS" \
+            --output "test-results/$AREA" \
+            --junitxml "test-results/$AREA.xml" \
+            --html "test-results/$AREA.html" --self-contained-html \
+            --flaky-report "test-results/$AREA-retries.json"
+          code=$?
+          echo "exit=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 5 ]; then exit 0; fi
+          exit "$code"
+
+      - name: Decide on a retry
+        id: retry
+        if: ${{ !cancelled() }}
+        env:
+          AREA: ${{ inputs.area }}
+          EXIT: ${{ steps.first.outputs.exit }}
+        run: |
+          retry=false
+          case "$EXIT" in
+            0|1|5) [ -f "test-results/$AREA.xml" ] || [ "$EXIT" = 5 ] || retry=true ;;
+            *) retry=true ;;
+          esac
+          echo "retry=$retry" >> "$GITHUB_OUTPUT"
+
+      - name: Run ${{ inputs.area }} again (pytest broke, not a test)
+        id: second
+        if: ${{ steps.retry.outputs.retry == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        env: *area-env
+        run: *area-run
+
+      - name: Verdict
+        if: ${{ !cancelled() }}
+        env:
+          FIRST: ${{ steps.first.outcome }}
+          SECOND: ${{ steps.second.outcome }}
+        run: |
+          outcome="${SECOND:-}"
+          if [ -z "$outcome" ] || [ "$outcome" = "skipped" ]; then outcome="$FIRST"; fi
+          echo "Area outcome: $outcome"
+          [ "$outcome" = "success" ]
+
+      - name: Upload ${{ inputs.area }} results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ inputs.area }}
+          path: test-results/
+          retention-days: 14
+          if-no-files-found: ignore
